@@ -4,4 +4,15 @@
 idf_component_register(
     SRC_DIRS "."
     INCLUDE_DIRS "." "../include"
+    REQUIRES
+        mqtt
+        nvs_flash
+        esp_wifi
+        esp_event
+        esp_netif
+        esp_timer
+        driver
+        esp_lcd
+        led_strip
+        esp_hw_support
 )
