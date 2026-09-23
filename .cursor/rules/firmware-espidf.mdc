@@ -1,0 +1,14 @@
+---
+description: ESP-IDF / PlatformIO firmware conventions for this fleet repo
+globs: src/**/*,include/**/*,platformio.ini,partitions.csv,sdkconfig.defaults*
+alwaysApply: false
+---
+
+# Firmware
+
+- Pure ESP-IDF C (`framework = espidf`); headers in `include/`, sources in `src/`
+- Identity via `DEVICE_MODEL`, `DEVICE_THING_TYPE`, `APP_VERSION`, `AWS_*` macros
+- Bootstrap states: `WIFI_NEEDED` → `PROVISION_AWS` → `READY` — do not fake READY
+- `partitions.csv`: otadata must end at/before `0x10000` (app0 start)
+- New IDF deps → `src/idf_component.yml`; document SPI/RMT ownership (C61: no RMT)
+- Validate with `pio run -e esp32-c61` (and matrix envs you touch)

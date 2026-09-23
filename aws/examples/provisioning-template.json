@@ -1,0 +1,77 @@
+{
+  "Parameters": {
+    "SerialNumber": {
+      "Type": "String"
+    },
+    "Model": {
+      "Type": "String"
+    },
+    "AWS::IoT::Certificate::Id": {
+      "Type": "String"
+    }
+  },
+  "Resources": {
+    "thing": {
+      "Type": "AWS::IoT::Thing",
+      "Properties": {
+        "ThingName": {
+          "Fn::Join": ["-", [{"Ref": "Model"}, {"Ref": "SerialNumber"}]]
+        },
+        "ThingTypeName": {
+          "Ref": "Model"
+        },
+        "AttributePayload": {
+          "model": {
+            "Ref": "Model"
+          },
+          "serial": {
+            "Ref": "SerialNumber"
+          }
+        }
+      }
+    },
+    "certificate": {
+      "Type": "AWS::IoT::Certificate",
+      "Properties": {
+        "CertificateId": {
+          "Ref": "AWS::IoT::Certificate::Id"
+        },
+        "Status": "Active"
+      }
+    },
+    "policy": {
+      "Type": "AWS::IoT::Policy",
+      "Properties": {
+        "PolicyName": {
+          "Fn::Join": ["-", [{"Ref": "Model"}, "device"]]
+        },
+        "PolicyDocument": {
+          "Version": "2012-10-17",
+          "Statement": [
+            {
+              "Effect": "Allow",
+              "Action": ["iot:Connect"],
+              "Resource": [
+                "arn:aws:iot:REGION:ACCOUNT_ID:client/${iot:Connection.Thing.ThingName}"
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["iot:Publish", "iot:Receive"],
+              "Resource": [
+                "arn:aws:iot:REGION:ACCOUNT_ID:topic/dt/${iot:Connection.Thing.ThingName}/*"
+              ]
+            },
+            {
+              "Effect": "Allow",
+              "Action": ["iot:Subscribe"],
+              "Resource": [
+                "arn:aws:iot:REGION:ACCOUNT_ID:topicfilter/dt/${iot:Connection.Thing.ThingName}/*"
+              ]
+            }
+          ]
+        }
+      }
+    }
+  }
+}

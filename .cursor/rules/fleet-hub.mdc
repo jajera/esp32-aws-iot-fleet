@@ -1,0 +1,29 @@
+---
+description: Central ESP32 fleet hub — scope, boards, secrets, and AWS safety
+alwaysApply: true
+---
+
+# esp32-aws-iot-fleet
+
+Central jajera ESP32 firmware repo (PlatformIO + ESP-IDF). Not the talk deck
+(`iot-everywhere-aws-talk`) and not the full lab (`aws-iot-walkthrough`).
+
+## Do
+
+- Prefer shared bootstrap here over copying firmware into demo/talk repos
+- Add boards as new `[env:…]` + Thing Type + CI matrix entry
+- Keep secrets out of git (`secrets.ini`, PEMs, keys)
+- Build with `pio run -e <env>`; flash only when the operator asks
+
+## Don't
+
+- Commit `secrets.ini`, claim/device certs, or generated `sdkconfig.<env>`
+- Redefine `build_flags` in `secrets.ini` (use `custom_aws_*` and `custom_wifi_*` only)
+- Run mutating AWS CLI / IaC unless operator set `FLEET_ALLOW_AWS=1`
+- Claim Arduino `rgbLedWrite` works on C61 (no RMT — SPI + DMA for WS2812)
+
+## Defaults
+
+- Default env: `esp32-c61`
+- Profile/region examples: `sandbox` / `ap-southeast-2`
+- Details: `.kiro/steering/` and `AGENTS.md`
