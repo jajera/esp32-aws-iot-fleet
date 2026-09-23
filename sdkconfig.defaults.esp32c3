@@ -1,0 +1,6 @@
+# ESP-IDF defaults for ESP32-C3 (native USB Serial/JTAG on DevKitM-1)
+
+CONFIG_ESPTOOLPY_FLASHSIZE_4MB=y
+
+# Console on USB Serial/JTAG so /dev/ttyACM* shows logs when using the USB port.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y

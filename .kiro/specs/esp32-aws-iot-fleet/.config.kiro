@@ -1,0 +1,5 @@
+{
+  "version": "1",
+  "title": "esp32-aws-iot-fleet",
+  "description": "Central ESP32 multi-model AWS IoT fleet firmware (PlatformIO + ESP-IDF)"
+}

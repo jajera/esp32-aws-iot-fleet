@@ -1,0 +1,6 @@
+# ESP32-C61 DevKit: console on USB Serial/JTAG (ACM), not UART0 pins.
+CONFIG_ESP_CONSOLE_USB_SERIAL_JTAG=y
+CONFIG_ESP_CONSOLE_UART_DEFAULT=n
+
+# Board reports 8MB; shared partitions.csv still fits in the lower 4MB.
+CONFIG_ESPTOOLPY_FLASHSIZE_8MB=y
