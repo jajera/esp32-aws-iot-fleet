@@ -7,7 +7,7 @@ Never log raw certificates or private material.
 """
 
 
-KNOWN_MODELS = frozenset({"ideaspark-oled", "esp32-s3", "esp32-c61", "esp32-c3"})
+KNOWN_MODELS = frozenset({"ideaspark-oled", "esp32-s3", "esp32-c61", "esp32-c3", "esp32-cam"})
 
 
 def handler(event, context):

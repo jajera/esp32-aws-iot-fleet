@@ -30,10 +30,12 @@ AGENTS.md               # agent entrypoint
 |-----|-------|------|
 | `esp32-c61` (default) | ESP32-C61-DevKitC-1 | **Primary** — Thing `esp32-c61-01` |
 | `ideaspark-oled` | Ideaspark ESP32 OLED-0.96 V3.0 | OLED status; Thing `ideaspark-oled-01` |
+| `ideaspark-oled-02` | Ideaspark ESP32 + 1.14″ ST7789 TFT | Colour status; Thing `ideaspark-oled-02` |
 | `esp32-s3` | ESP32-S3 N16R8-class | RGB status; Thing `esp32-s3-01` |
 | `esp32-c3` | ESP32-C3-DevKitM-1 class | RGB status; Thing `esp32-c3-01` |
+| `esp32-cam` | AI-Thinker ESP32-CAM + CAM-MB | Camera + SD; Thing `esp32-cam-01` |
 
-Board notes: [`docs/boards/esp32-c61.md`](docs/boards/esp32-c61.md), [`docs/boards/ideaspark-oled.md`](docs/boards/ideaspark-oled.md), [`docs/boards/esp32-s3.md`](docs/boards/esp32-s3.md), [`docs/boards/esp32-c3.md`](docs/boards/esp32-c3.md).
+Board notes: [`docs/boards/esp32-c61.md`](docs/boards/esp32-c61.md), [`docs/boards/ideaspark-oled.md`](docs/boards/ideaspark-oled.md), [`docs/boards/ideaspark-oled-02.md`](docs/boards/ideaspark-oled-02.md), [`docs/boards/esp32-s3.md`](docs/boards/esp32-s3.md), [`docs/boards/esp32-c3.md`](docs/boards/esp32-c3.md), [`docs/boards/esp32-cam.md`](docs/boards/esp32-cam.md).
 
 ## Secrets (public repo)
 
@@ -114,7 +116,7 @@ Every model publishes JSON to `fleet/<thing>/telemetry` (~15s) with the same key
 
 ## CI
 
-actionsforge reusables: markdown lint, YAML lint, commitmsg-conform, Dependabot auto-merge. Local `platformio-build.yml` builds all four envs + `scripts/check_no_secrets.sh`.
+actionsforge reusables: markdown lint, YAML lint, commitmsg-conform, Dependabot auto-merge. Local `platformio-build.yml` builds all model envs + `scripts/check_no_secrets.sh`.
 
 ## Agent tooling
 

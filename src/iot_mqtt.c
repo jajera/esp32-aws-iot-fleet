@@ -6,6 +6,13 @@
 #include <stdio.h>
 #include <string.h>
 
+#ifndef MQTT_BUFFER_SIZE
+#define MQTT_BUFFER_SIZE 4096
+#endif
+#ifndef MQTT_OUT_BUFFER_SIZE
+#define MQTT_OUT_BUFFER_SIZE 8192
+#endif
+
 static const char *TAG = "iot";
 static esp_mqtt_client_handle_t s_client;
 static volatile bool s_connected;
@@ -53,6 +60,9 @@ bool iot_mqtt_init(const char *endpoint, const char *thing_name, const char *ca_
         .credentials.authentication.key = key_pem,
         .session.keepalive = 30,
         .network.reconnect_timeout_ms = 5000,
+        /* Telemetry/events are small; camera frames need a large out buffer. */
+        .buffer.size = MQTT_BUFFER_SIZE,
+        .buffer.out_size = MQTT_OUT_BUFFER_SIZE,
     };
 
     s_client = esp_mqtt_client_init(&cfg);
@@ -76,10 +86,19 @@ static bool publish_topic(const char *suffix, const char *json, size_t len)
     if (!s_connected || s_client == NULL || json == NULL || s_thing[0] == '\0') {
         return false;
     }
+    if (len >= (size_t)MQTT_OUT_BUFFER_SIZE) {
+        ESP_LOGW(TAG, "publish %s dropped: len=%u >= out_buf=%d", suffix, (unsigned)len,
+                 MQTT_OUT_BUFFER_SIZE);
+        return false;
+    }
     char topic[96];
     snprintf(topic, sizeof(topic), "fleet/%s/%s", s_thing, suffix);
     int msg_id = esp_mqtt_client_publish(s_client, topic, json, (int)len, 1, 0);
-    return msg_id >= 0;
+    if (msg_id < 0) {
+        ESP_LOGW(TAG, "publish %s failed msg_id=%d len=%u", suffix, msg_id, (unsigned)len);
+        return false;
+    }
+    return true;
 }
 
 bool iot_mqtt_publish_telemetry(const char *json, size_t len)
@@ -90,4 +109,9 @@ bool iot_mqtt_publish_telemetry(const char *json, size_t len)
 bool iot_mqtt_publish_event(const char *json, size_t len)
 {
     return publish_topic("events", json, len);
+}
+
+bool iot_mqtt_publish_camera(const char *json, size_t len)
+{
+    return publish_topic("camera", json, len);
 }

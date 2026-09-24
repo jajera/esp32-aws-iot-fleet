@@ -1,0 +1,3 @@
+# Auto-managed symlink for esp32-cam builds (see scripts/ensure_cam_component.py).
+# Keep this directory tracked empty so non-cam clones stay clean.
+cam_deps

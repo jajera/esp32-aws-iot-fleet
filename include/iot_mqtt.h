@@ -8,3 +8,4 @@ bool iot_mqtt_init(const char *endpoint, const char *thing_name, const char *ca_
 bool iot_mqtt_is_connected(void);
 bool iot_mqtt_publish_telemetry(const char *json, size_t len);
 bool iot_mqtt_publish_event(const char *json, size_t len);
+bool iot_mqtt_publish_camera(const char *json, size_t len);

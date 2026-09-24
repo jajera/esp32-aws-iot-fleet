@@ -17,8 +17,10 @@ inclusion: always
 |-----|-------|--------|
 | `esp32-c61` (default) | `esp32-c61-devkitc1` | Primary; Thing `esp32-c61-01` |
 | `ideaspark-oled` | `esp32dev` | Ideaspark ESP32 OLED-0.96 V3.0; Thing `ideaspark-oled-01` |
+| `ideaspark-oled-02` | `esp32dev` | Ideaspark + 1.14″ ST7789 TFT; Thing `ideaspark-oled-02` |
 | `esp32-s3` | `esp32-s3-devkitc-1` | N16R8-class; Thing `esp32-s3-01` |
 | `esp32-c3` | `esp32-c3-devkitm-1` | DevKitM-1 class; Thing `esp32-c3-01` |
+| `esp32-cam` | `esp32cam` | AI-Thinker ESP32-CAM + CAM-MB; Thing `esp32-cam-01` |
 
 Add an env when you add an AWS Thing Type / SKU. Put the name in
 `.github/workflows/platformio-build.yml` matrix too.
