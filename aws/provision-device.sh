@@ -82,7 +82,8 @@ POLICY_DOC=$(cat <<EOF
       "Action": "iot:Publish",
       "Resource": [
         "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/fleet/${THING_NAME}/telemetry",
-        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/fleet/${THING_NAME}/events"
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/fleet/${THING_NAME}/events",
+        "arn:aws:iot:${REGION}:${ACCOUNT_ID}:topic/fleet/${THING_NAME}/camera"
       ]
     },
     {

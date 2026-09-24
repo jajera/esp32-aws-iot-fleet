@@ -16,7 +16,7 @@ Central ESP32 multi-model AWS IoT fleet firmware (PlatformIO + ESP-IDF).
 
 ```text
 src/ include/           shared firmware (Wi‑Fi, MQTT, telemetry, OLED/RGB)
-platformio.ini          esp32-c61 (default), ideaspark-oled, esp32-s3, esp32-c3
+platformio.ini          esp32-c61 (default), ideaspark-oled, ideaspark-oled-02, esp32-s3, esp32-c3, esp32-cam
 aws/provision-device.sh pre-provision Thing + device_certs.h
 aws/examples/           claim policy / template stubs (future)
 docs/boards/            per-model notes
@@ -29,8 +29,10 @@ scripts/                ensure_secrets.py, check_no_secrets.sh
 ```bash
 pio run -e esp32-c61
 pio run -e ideaspark-oled
+pio run -e ideaspark-oled-02
 pio run -e esp32-s3
 pio run -e esp32-c3
+pio run -e esp32-cam
 ./scripts/check_no_secrets.sh
 ```
 

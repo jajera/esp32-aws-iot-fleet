@@ -18,6 +18,10 @@ static void IRAM_ATTR on_boot_isr(void *arg)
 
 void boot_button_init(void)
 {
+#if !defined(BOOT_BUTTON_GPIO) || (BOOT_BUTTON_GPIO < 0)
+    (void)on_boot_isr;
+    return;
+#else
     gpio_config_t cfg = {
         .pin_bit_mask = 1ULL << BOOT_BUTTON_GPIO,
         .mode = GPIO_MODE_INPUT,
@@ -31,10 +35,14 @@ void boot_button_init(void)
         ESP_ERROR_CHECK(isr);
     }
     ESP_ERROR_CHECK(gpio_isr_handler_add(BOOT_BUTTON_GPIO, on_boot_isr, NULL));
+#endif
 }
 
 bool boot_button_take_press(void)
 {
+#if !defined(BOOT_BUTTON_GPIO) || (BOOT_BUTTON_GPIO < 0)
+    return false;
+#else
     if (!atomic_exchange(&s_pending, false)) {
         return false;
     }
@@ -48,4 +56,5 @@ bool boot_button_take_press(void)
     }
     s_last_us = now;
     return true;
+#endif
 }

@@ -1,0 +1,3 @@
+## Camera stack dependency — only loaded for the esp32-cam PlatformIO env.
+dependencies:
+  espressif/esp32-camera: "^2.0.15"

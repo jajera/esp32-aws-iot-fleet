@@ -1,6 +1,8 @@
 #include "status_display.h"
 #include "app_config.h"
 
+#if !defined(DEVICE_HAS_STATUS_TFT) || !DEVICE_HAS_STATUS_TFT
+
 #include "driver/gpio.h"
 #include "driver/i2c_master.h"
 #include "esp_check.h"
@@ -22,6 +24,15 @@
 #ifndef LCD_I2C_ADDR
 #define LCD_I2C_ADDR 0x3C
 #endif
+#ifndef LCD_COLUMN_OFFSET
+#define LCD_COLUMN_OFFSET 0
+#endif
+#ifndef LCD_WIDTH
+#define LCD_WIDTH 128
+#endif
+#ifndef LCD_HEIGHT
+#define LCD_HEIGHT 64
+#endif
 
 static const char *TAG = "lcd";
 
@@ -30,7 +41,7 @@ static bool s_ready;
 static bool s_blank;
 static unsigned s_blank_timeout_s = 30;
 static int64_t s_last_activity_us;
-static uint8_t s_fb[128 * 64 / 8];
+static uint8_t s_fb[LCD_WIDTH * LCD_HEIGHT / 8];
 static status_display_model_t s_last_model;
 static bool s_have_model;
 
@@ -104,10 +115,10 @@ static void fb_clear(void)
 
 static void fb_pixel(int x, int y, bool on)
 {
-    if (x < 0 || x >= 128 || y < 0 || y >= 64) {
+    if (x < 0 || x >= LCD_WIDTH || y < 0 || y >= LCD_HEIGHT) {
         return;
     }
-    const size_t i = (size_t)x + ((size_t)(y / 8) * 128);
+    const size_t i = (size_t)x + ((size_t)(y / 8) * LCD_WIDTH);
     const uint8_t bit = (uint8_t)(1u << (y & 7));
     if (on) {
         s_fb[i] |= bit;
@@ -136,7 +147,7 @@ static void fb_char(int x, int y, char c)
 
 static void fb_text(int x, int y, const char *s)
 {
-    while (*s && x < 128 - 5) {
+    while (*s && x < LCD_WIDTH - 5) {
         fb_char(x, y, *s++);
         x += 6;
     }
@@ -153,8 +164,10 @@ static void fb_bar(int x, int y, int w, int h, int filled)
 
 static void fb_flush(void)
 {
-    // SSD1306 vertical addressing via esp_lcd expects page-major buffer.
-    ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(s_panel, 0, 0, 128, 64, s_fb));
+    // SSD1306 / SH1106: SH1106 1.3" panels often need a 2-column RAM offset.
+    const int x0 = LCD_COLUMN_OFFSET;
+    const int x1 = LCD_COLUMN_OFFSET + LCD_WIDTH;
+    ESP_ERROR_CHECK(esp_lcd_panel_draw_bitmap(s_panel, x0, 0, x1, LCD_HEIGHT, s_fb));
 }
 
 bool status_display_init(void)
@@ -181,7 +194,7 @@ bool status_display_init(void)
     esp_lcd_panel_io_handle_t io = NULL;
     esp_lcd_panel_io_i2c_config_t io_cfg = {
         .dev_addr = LCD_I2C_ADDR,
-        .scl_speed_hz = 400000,
+        .scl_speed_hz = 100000,
         .control_phase_bytes = 1,
         .lcd_cmd_bits = 8,
         .lcd_param_bits = 8,
@@ -197,22 +210,41 @@ bool status_display_init(void)
         .reset_gpio_num = -1,
         .bits_per_pixel = 1,
     };
+    esp_lcd_panel_ssd1306_config_t ssd_cfg = {
+        .height = LCD_HEIGHT,
+    };
+    panel_cfg.vendor_config = &ssd_cfg;
     err = esp_lcd_new_panel_ssd1306(io, &panel_cfg, &s_panel);
     if (err != ESP_OK) {
-        ESP_LOGW(TAG, "ssd1306 init failed (addr=0x%02x sda=%d scl=%d): %s", LCD_I2C_ADDR,
+        ESP_LOGW(TAG, "ssd1306 new failed (addr=0x%02x sda=%d scl=%d): %s", LCD_I2C_ADDR,
                  LCD_SDA_GPIO, LCD_SCL_GPIO, esp_err_to_name(err));
         return false;
     }
 
-    ESP_ERROR_CHECK(esp_lcd_panel_reset(s_panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_init(s_panel));
-    ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
+    err = esp_lcd_panel_reset(s_panel);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "panel reset failed: %s", esp_err_to_name(err));
+        return false;
+    }
+    err = esp_lcd_panel_init(s_panel);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "panel init failed (addr=0x%02x sda=%d scl=%d) — continuing without LCD: %s",
+                 LCD_I2C_ADDR, LCD_SDA_GPIO, LCD_SCL_GPIO, esp_err_to_name(err));
+        s_panel = NULL;
+        return false;
+    }
+    err = esp_lcd_panel_disp_on_off(s_panel, true);
+    if (err != ESP_OK) {
+        ESP_LOGW(TAG, "disp_on failed: %s", esp_err_to_name(err));
+        s_panel = NULL;
+        return false;
+    }
 
     s_ready = true;
     s_blank = false;
     s_last_activity_us = esp_timer_get_time();
-    ESP_LOGI(TAG, "SSD1306 ready addr=0x%02x sda=%d scl=%d blank_timeout=%us", LCD_I2C_ADDR,
-             LCD_SDA_GPIO, LCD_SCL_GPIO, s_blank_timeout_s);
+    ESP_LOGI(TAG, "OLED ready addr=0x%02x sda=%d scl=%d col_off=%d blank_timeout=%us", LCD_I2C_ADDR,
+             LCD_SDA_GPIO, LCD_SCL_GPIO, LCD_COLUMN_OFFSET, s_blank_timeout_s);
 
     status_display_model_t boot = {0};
     snprintf(boot.thing_name, sizeof(boot.thing_name), "booting");
@@ -244,7 +276,9 @@ void status_display_wake(void)
     }
     s_last_activity_us = esp_timer_get_time();
     if (s_blank) {
-        ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, true));
+        if (esp_lcd_panel_disp_on_off(s_panel, true) != ESP_OK) {
+            return;
+        }
         s_blank = false;
         ESP_LOGI(TAG, "display wake (BOOT)");
         if (s_have_model) {
@@ -260,9 +294,10 @@ void status_display_tick(void)
     }
     const int64_t idle_us = (int64_t)s_blank_timeout_s * 1000000LL;
     if (esp_timer_get_time() - s_last_activity_us >= idle_us) {
-        ESP_ERROR_CHECK(esp_lcd_panel_disp_on_off(s_panel, false));
-        s_blank = true;
-        ESP_LOGI(TAG, "display blank after %us idle", s_blank_timeout_s);
+        if (esp_lcd_panel_disp_on_off(s_panel, false) == ESP_OK) {
+            s_blank = true;
+            ESP_LOGI(TAG, "display blank after %us idle", s_blank_timeout_s);
+        }
     }
 }
 
@@ -320,3 +355,5 @@ void status_display_update(const status_display_model_t *model)
     }
     fb_flush();
 }
+
+#endif /* !DEVICE_HAS_STATUS_TFT */

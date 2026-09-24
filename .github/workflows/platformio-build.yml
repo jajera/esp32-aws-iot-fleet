@@ -27,7 +27,7 @@ jobs:
     strategy:
       fail-fast: false
       matrix:
-        env: [esp32-c61, ideaspark-oled, esp32-s3, esp32-c3]
+        env: [esp32-c61, ideaspark-oled, ideaspark-oled-02, esp32-s3, esp32-c3, esp32-cam]
     steps:
       - name: Checkout
         uses: actions/checkout@3d3c42e5aac5ba805825da76410c181273ba90b1  # v7.0.1

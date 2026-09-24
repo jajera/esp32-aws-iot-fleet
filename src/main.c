@@ -1,4 +1,6 @@
 #include "app_config.h"
+#include "board_camera.h"
+#include "board_sd.h"
 #include "boot_button.h"
 #include "bootstrap.h"
 #include "chip_sensors.h"
@@ -21,9 +23,12 @@
 #include "esp_sntp.h"
 
 #include <stdio.h>
+#include <stdlib.h>
 #include <string.h>
 #include <sys/time.h>
 #include <time.h>
+
+#include "mbedtls/base64.h"
 
 #if __has_include("device_certs.h")
 #include "device_certs.h"
@@ -133,6 +138,11 @@ static int build_telemetry_json(char *out, size_t out_len)
     const bool has_emb_flash = (chip.features & CHIP_FEATURE_EMB_FLASH) != 0;
     const bool has_emb_psram = (chip.features & CHIP_FEATURE_EMB_PSRAM) != 0;
 
+    board_camera_status_t cam = {0};
+    board_sd_status_t sd = {0};
+    board_camera_get_status(&cam);
+    board_sd_get_status(&sd);
+
     return snprintf(
         out, out_len,
         "{"
@@ -168,6 +178,16 @@ static int build_telemetry_json(char *out, size_t out_len)
         "\"reset_reason\":%d,"
         "\"app_version\":\"%s\","
         "\"model\":\"%s\","
+        "\"camera_ok\":%s,"
+        "\"camera_sensor\":\"%s\","
+        "\"camera_frame_bytes\":%lu,"
+        "\"camera_captures\":%lu,"
+        "\"camera_fails\":%lu,"
+        "\"sd_ok\":%s,"
+        "\"sd_total_mb\":%lu,"
+        "\"sd_free_mb\":%lu,"
+        "\"sd_writes\":%lu,"
+        "\"sd_fails\":%lu,"
         "\"clock_offset_ms\":0"
         "}",
         THING_NAME, (unsigned long)epoch_now(), (int)wifi_net_rssi(), (unsigned long)uptime_s,
@@ -177,7 +197,73 @@ static int build_telemetry_json(char *out, size_t out_len)
         has_emb_flash ? "true" : "false", has_emb_psram ? "true" : "false", (unsigned)cpu_mhz,
         (unsigned long)flash_bytes, (unsigned long)psram_bytes, (unsigned long)psram_free, mac_str,
         bssid_str, ssid, (int)link.status, (int)link.channel, link.ip, link.gateway, link.dns,
-        (int)esp_reset_reason(), APP_VERSION, DEVICE_MODEL);
+        (int)esp_reset_reason(), APP_VERSION, DEVICE_MODEL,
+        cam.ok ? "true" : "false", cam.sensor[0] ? cam.sensor : "",
+        (unsigned long)cam.last_frame_bytes, (unsigned long)cam.capture_count,
+        (unsigned long)cam.fail_count, sd.ok ? "true" : "false",
+        (unsigned long)(sd.total_bytes / (1024 * 1024)), (unsigned long)(sd.free_bytes / (1024 * 1024)),
+        (unsigned long)sd.write_count, (unsigned long)sd.fail_count);
+}
+
+static void cam_capture_publish(void)
+{
+#if DEVICE_HAS_CAMERA
+    uint8_t *jpg = NULL;
+    size_t jpg_len = 0;
+    if (!board_camera_capture_jpeg(&jpg, &jpg_len) || !jpg || jpg_len == 0) {
+        return;
+    }
+
+#if DEVICE_HAS_SD
+    char path[80];
+    snprintf(path, sizeof(path), "/sdcard/fleet/%s_%lu.jpg", THING_NAME, (unsigned long)epoch_now());
+    if (!board_sd_write_file(path, jpg, jpg_len)) {
+        ESP_LOGW(TAG, "sd write failed for capture");
+    }
+#endif
+
+    if (iot_mqtt_is_connected()) {
+        size_t b64_len = 0;
+        mbedtls_base64_encode(NULL, 0, &b64_len, jpg, jpg_len);
+        const size_t msg_est = b64_len + 160;
+#ifndef MQTT_OUT_BUFFER_SIZE
+#define MQTT_OUT_BUFFER_SIZE 8192
+#endif
+        if (msg_est >= (size_t)MQTT_OUT_BUFFER_SIZE) {
+            ESP_LOGW(TAG, "camera frame too large for MQTT (%u jpeg → ~%u mqtt, out_buf=%d)",
+                     (unsigned)jpg_len, (unsigned)msg_est, MQTT_OUT_BUFFER_SIZE);
+        } else {
+            char *b64 = (char *)malloc(b64_len + 1);
+            char *msg = NULL;
+            if (b64) {
+                size_t out_len = 0;
+                if (mbedtls_base64_encode((unsigned char *)b64, b64_len + 1, &out_len, jpg,
+                                         jpg_len) == 0) {
+                    b64[out_len] = '\0';
+                    const size_t msg_cap = out_len + 160;
+                    msg = (char *)malloc(msg_cap);
+                    if (msg) {
+                        int n = snprintf(msg, msg_cap,
+                                         "{\"device_id\":\"%s\",\"ts\":%lu,\"type\":\"camera\","
+                                         "\"jpeg_b64\":\"%s\"}",
+                                         THING_NAME, (unsigned long)epoch_now(), b64);
+                        if (n > 0 && (size_t)n < msg_cap &&
+                            iot_mqtt_publish_camera(msg, (size_t)n)) {
+                            ESP_LOGI(TAG, "camera frame published %u jpeg / %d mqtt bytes",
+                                     (unsigned)jpg_len, n);
+                        } else {
+                            ESP_LOGW(TAG, "camera mqtt publish failed");
+                        }
+                    }
+                }
+            }
+            free(msg);
+            free(b64);
+        }
+    }
+
+    board_camera_release_frame();
+#endif
 }
 
 static void start_sntp(void)
@@ -203,6 +289,21 @@ void app_main(void)
     status_display_init();
     status_display_set_blank_timeout_s(30);
     status_rgb_init();
+#if DEVICE_HAS_SD
+    /* Mount SD before camera — CAM init touches shared straps/GPIOs. */
+    if (board_sd_init()) {
+        ESP_LOGI(TAG, "sd init ok");
+    } else {
+        ESP_LOGW(TAG, "sd init failed");
+    }
+#endif
+#if DEVICE_HAS_CAMERA
+    if (board_camera_init()) {
+        ESP_LOGI(TAG, "camera init ok");
+    } else {
+        ESP_LOGW(TAG, "camera init failed");
+    }
+#endif
     refresh_display("init");
 #if !HAS_DEVICE_CERTS
     ESP_LOGW(TAG, "no device_certs.h — run aws/provision-device.sh then rebuild");
@@ -236,6 +337,8 @@ void app_main(void)
     }
 
     int64_t last_pub_us = 0;
+    int64_t last_cam_us = 0;
+    bool cam_boot_done = false;
     while (1) {
         if (boot_button_take_press()) {
             status_display_wake();
@@ -261,8 +364,18 @@ void app_main(void)
 
         if (wifi_ok && iot_ok) {
             const int64_t now = esp_timer_get_time();
+#if DEVICE_HAS_CAMERA
+            if (!cam_boot_done) {
+                cam_capture_publish();
+                last_cam_us = now;
+                cam_boot_done = true;
+            } else if (now - last_cam_us > 300LL * 1000000LL) {
+                cam_capture_publish();
+                last_cam_us = now;
+            }
+#endif
             if (now - last_pub_us > 15LL * 1000000LL) {
-                char json[1200];
+                char json[1600];
                 int n = build_telemetry_json(json, sizeof(json));
                 if (n > 0 && n < (int)sizeof(json) && iot_mqtt_publish_telemetry(json, (size_t)n)) {
                     snprintf(extra, sizeof(extra), "pub ok");
