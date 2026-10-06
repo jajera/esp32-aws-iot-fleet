@@ -23,7 +23,7 @@ IOT  CONNECTED
 linked / pub ok
 ```
 
-Display blanks after **30s** idle (`esp_lcd_panel_disp_on_off`). Press **BOOT** (GPIO0, active-low) to wake. BOOT also publishes `fleet/<thing>/events` (`type=button`).
+Display stays on (`blank_timeout=0`). Press **BOOT** (GPIO0, active-low) to publish `fleet/<thing>/events` (`type=button`).
 
 ## Telemetry (onboard only — no external sensors)
 
