@@ -287,7 +287,7 @@ void app_main(void)
     chip_sensors_init();
     boot_button_init();
     status_display_init();
-    status_display_set_blank_timeout_s(30);
+    status_display_set_blank_timeout_s(0);
     status_rgb_init();
 #if DEVICE_HAS_SD
     /* Mount SD before camera — CAM init touches shared straps/GPIOs. */
